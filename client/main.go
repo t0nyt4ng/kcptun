@@ -553,6 +553,9 @@ func main() {
 		chScavenger := make(chan timedSession, 128)
 		go scavenger(chScavenger, &config)
 
+		// start parentMonitor
+		go parentMonitor(3)
+
 		// start listener
 		numconn := uint16(config.Conn)
 		muxes := make([]timedSession, numconn)
@@ -579,6 +582,25 @@ func main() {
 		}
 	}
 	myApp.Run(os.Args)
+}
+
+const (
+	maxScavengeTTL = 10 * time.Minute
+)
+
+func parentMonitor(interval int) {
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	defer ticker.Stop()
+	pid := os.Getppid()
+	for {
+		select {
+		case <-ticker.C:
+			curpid := os.Getppid()
+			if curpid != pid {
+				os.Exit(1)
+			}
+		}
+	}
 }
 
 func scavenger(ch chan timedSession, config *Config) {
